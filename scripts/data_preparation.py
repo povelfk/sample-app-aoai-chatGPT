@@ -438,16 +438,20 @@ if __name__ == "__main__":
 
     credential = AzureCliCredential()
     form_recognizer_client = None
+    args.form_rec_resource = "westeurope.api"
+    # print(args.form_rec_resource)
+    # Endpoint to form recognizer is hard-coded due to resource name doesn't match with endpoint
+    # "https://{args.form_rec_resource}.cognitiveservices.azure.com/" -> "https://westeurope.api.cognitive.microsoft.com/" 
 
     print("Data preparation script started")
     if args.search_admin_key:
         os.environ["AZURE_SEARCH_ADMIN_KEY"] = args.search_admin_key
 
     if args.form_rec_resource and args.form_rec_key:
-        os.environ["FORM_RECOGNIZER_ENDPOINT"] = f"https://{args.form_rec_resource}.cognitiveservices.azure.com/"
+        os.environ["FORM_RECOGNIZER_ENDPOINT"] = "https://westeurope.api.cognitive.microsoft.com/" 
         os.environ["FORM_RECOGNIZER_KEY"] = args.form_rec_key
         if args.njobs==1:
-            form_recognizer_client = DocumentAnalysisClient(endpoint=f"https://{args.form_rec_resource}.cognitiveservices.azure.com/", credential=AzureKeyCredential(args.form_rec_key))
+            form_recognizer_client = DocumentAnalysisClient(endpoint="https://westeurope.api.cognitive.microsoft.com/", credential=AzureKeyCredential(args.form_rec_key))
         print(f"Using Form Recognizer resource {args.form_rec_resource} for PDF cracking, with the {'Layout' if args.form_rec_use_layout else 'Read'} model.")
 
     for index_config in config:

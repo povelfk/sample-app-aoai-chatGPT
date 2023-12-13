@@ -705,7 +705,22 @@ const Chat = () => {
                             />
                         </Stack>
                     </div>
-                    {/* Citation Panel */}
+                    {const onViewSource = (citation: Citation) => {
+                            if (citation.url) {
+                                window.open(citation.url, "_blank");
+                            }
+                        };
+                        <span 
+                            title={activeCitation.url} 
+                            tabIndex={0} 
+                            role="link" 
+                            onClick={() => onViewSource(activeCitation)} 
+                            onKeyDown={e => e.key === "Enter" || e.key === " " ? onViewSource(activeCitation) : null}
+                            className={styles.viewSourceButton}
+                            aria-label={activeCitation.url}
+                        >
+                            View Source
+                    </span>}
                     {messages && messages.length > 0 && isCitationPanelOpen && activeCitation && ( 
                     <Stack.Item className={styles.citationPanel} tabIndex={0} role="tabpanel" aria-label="Citations Panel">
                         <Stack aria-label="Citations Panel Header Container" horizontal className={styles.citationPanelHeaderContainer} horizontalAlign="space-between" verticalAlign="center">

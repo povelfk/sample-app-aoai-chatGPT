@@ -25,6 +25,12 @@ from bs4 import BeautifulSoup
 from langchain.text_splitter import TextSplitter, MarkdownTextSplitter, RecursiveCharacterTextSplitter, PythonCodeTextSplitter
 from tqdm import tqdm
 from typing import Any
+from dotenv import load_dotenv
+
+# from docx import Document
+# import mammoth
+# from bs4 import BeautifulSoup
+import docx2txt
 
 
 FILE_FORMAT_DICT = {
@@ -34,7 +40,8 @@ FILE_FORMAT_DICT = {
         "shtml": "html",
         "htm": "html",
         "py": "python",
-        "pdf": "pdf"
+        "pdf": "pdf",
+        "docx": "docx"
     }
 
 RETRY_COUNT = 5
@@ -467,7 +474,7 @@ def downloadBlobUrlToLocalFolder(blob_url, local_folder, credential):
         path = path + '/'
 
     last_destination_folder = None
-    for blob in container_client.list_blobs(name_starts_with=path):
+    for blob in container_client.list_blobs(name_starts_with=path): 
         relative_path = blob.name[len(path):]
         destination_path = os.path.join(local_folder, relative_path)
         destination_folder = os.path.dirname(destination_path)
@@ -643,13 +650,15 @@ def chunk_content_helper(
         token_overlap: int,
         num_tokens: int = 256
 ) -> Generator[Tuple[str, int, Document], None, None]:
+
     if num_tokens is None:
         num_tokens = 1000000000
 
     parser = parser_factory(file_format.split("_pdf")[0]) # to handle cracked pdf converted to html
     doc = parser.parse(content, file_name=file_name)
-    # if the original doc after parsing is < num_tokens return as it is
     doc_content_size = TOKEN_ESTIMATOR.estimate_tokens(doc.content)
+
+    # if the original doc after parsing is < num_tokens return as it is
     if doc_content_size < num_tokens:
         yield doc.content, doc_content_size, doc
     else:
@@ -712,12 +721,14 @@ def chunk_content(
             file_format = "text"
         elif cracked_pdf:
             file_format = "html_pdf" # differentiate it from native html
+        elif file_name.endswith("docx"):
+            file_format = "text"
         else:
             file_format = _get_file_format(file_name, extensions_to_process)
             if file_format is None:
                 raise Exception(
                     f"{file_name} is not supported")
-
+        
         chunked_context = chunk_content_helper(
             content=content,
             file_name=file_name,
@@ -725,6 +736,7 @@ def chunk_content(
             num_tokens=num_tokens,
             token_overlap=token_overlap
         )
+
         chunks = []
         skipped_chunks = 0
         for chunk, chunk_size, doc in chunked_context:
@@ -738,8 +750,6 @@ def chunk_content(
                             time.sleep(30)
                     if doc.contentVector is None:
                         raise Exception(f"Error getting embedding for chunk={chunk}")
-                    
-
                 chunks.append(
                     Document(
                         content=chunk,
@@ -768,6 +778,10 @@ def chunk_content(
         total_files=1,
         skipped_chunks=skipped_chunks,
     )
+
+def docx_to_txt(file_path):
+    result = docx2txt.process(file_path)
+    return result
 
 def chunk_file(
     file_path: str,
@@ -798,13 +812,15 @@ def chunk_file(
             )
         else:
             raise UnsupportedFormatError(f"{file_name} is not supported")
-
+    
     cracked_pdf = False
     if file_format == "pdf":
         if form_recognizer_client is None:
             raise UnsupportedFormatError("form_recognizer_client is required for pdf files")
         content = extract_pdf_content(file_path, form_recognizer_client, use_layout=use_layout)
         cracked_pdf = True
+    elif file_format == "docx":
+        content = docx_to_txt(file_path)
     else:
         try:
             with open(file_path, "r", encoding="utf8") as f:

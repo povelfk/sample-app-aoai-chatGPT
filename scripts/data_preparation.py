@@ -269,6 +269,7 @@ def upload_documents_to_index(service_name, subscription_id, resource_group, ind
         to_upload_dicts.append(d)
         id += 1
     
+    
     endpoint = "https://{}.search.windows.net/".format(service_name)
     if not admin_key:
         admin_key = json.loads(

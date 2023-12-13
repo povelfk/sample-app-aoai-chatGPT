@@ -7,3 +7,4 @@ __pycache__/
 .ipynb_checkpoints/
 scripts/config_rv.json
 scripts/config2.json
+.vscode/launch.json

@@ -7,18 +7,18 @@ param environmentName string
 
 @minLength(1)
 @description('Primary location for all resources')
-param location string
+param location string = 'westeurope'
 
 param appServicePlanName string = ''
 param backendServiceName string = ''
 param resourceGroupName string = ''
 
-param searchServiceName string = ''
-param searchServiceResourceGroupName string = ''
+param searchServiceName string = 'cog-search-jd5ypzfx2l6vi'
+param searchServiceResourceGroupName string = 'rg-rv-chatbot3'
 param searchServiceResourceGroupLocation string = location
-param searchServiceSkuName string = ''
-param searchIndexName string = 'gptkbindex'
-param searchUseSemanticSearch bool = false
+param searchServiceSkuName string = 'standard'
+param searchIndexName string = 'agresso-idx-test'
+param searchUseSemanticSearch bool = true
 param searchSemanticSearchConfig string = 'default'
 param searchTopK int = 5
 param searchEnableInDomain bool = true
@@ -27,20 +27,20 @@ param searchFilenameColumn string = 'filepath'
 param searchTitleColumn string = 'title'
 param searchUrlColumn string = 'url'
 
-param openAiResourceName string = ''
-param openAiResourceGroupName string = ''
-param openAiResourceGroupLocation string = location
-param openAiSkuName string = ''
-param openAIModel string = 'turbo16k'
+param openAiResourceName string = 'rv-chatbot-aoai'
+param openAiResourceGroupName string = 'rg-rv-chatbot'
+param openAiResourceGroupLocation string = 'swedencentral'
+param openAiSkuName string = 'Standard'
+param openAIModel string = 'gpt-35-turbo-16k'
 param openAIModelName string = 'gpt-35-turbo-16k'
 param openAITemperature int = 0
 param openAITopP int = 1
 param openAIMaxTokens int = 1000
 param openAIStopSequence string = ''
-param openAISystemMessage string = 'You are an AI assistant that helps people find information.'
+param openAISystemMessage string = 'Du är en hjälpsam assistent från Sverige. Du pratar och förstår svenska på en extremt hög nivå, och du svarar alltid på svenska.'
 param openAIApiVersion string = '2023-06-01-preview'
 param openAIStream bool = true
-param embeddingDeploymentName string = 'embedding'
+param embeddingDeploymentName string = 'text-embedding-ada-002'
 param embeddingModelName string = 'text-embedding-ada-002'
 
 // Used by prepdocs.py: Form recognizer

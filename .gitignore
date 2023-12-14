@@ -9,3 +9,4 @@ scripts/config_rv.json
 scripts/config2.json
 .vscode/launch.json
 set_env.ps1
+.azure

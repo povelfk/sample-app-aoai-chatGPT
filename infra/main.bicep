@@ -14,7 +14,7 @@ param backendServiceName string = ''
 param resourceGroupName string = ''
 
 param searchServiceName string = 'cog-search-jd5ypzfx2l6vi'
-param searchServiceResourceGroupName string = 'rg-rv-chatbot3'
+param searchServiceResourceGroupName string = 'digge-bicep'
 param searchServiceResourceGroupLocation string = location
 param searchServiceSkuName string = 'standard'
 param searchIndexName string = 'agresso-idx-test'

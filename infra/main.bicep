@@ -7,17 +7,17 @@ param environmentName string
 
 @minLength(1)
 @description('Primary location for all resources')
-param location string = 'westeurope'
+param location string
 
 param appServicePlanName string = ''
 param backendServiceName string = ''
 param resourceGroupName string = ''
 
 param searchServiceName string = 'cog-search-jd5ypzfx2l6vi'
-param searchServiceResourceGroupName string = 'digge-bicep'
+param searchServiceResourceGroupName string = 'rg-rv-chatbot'
 param searchServiceResourceGroupLocation string = location
 param searchServiceSkuName string = 'standard'
-param searchIndexName string = 'agresso-idx-test'
+param searchIndexName string = 'digge-final'
 param searchUseSemanticSearch bool = true
 param searchSemanticSearchConfig string = 'default'
 param searchTopK int = 5
@@ -139,6 +139,9 @@ module backend 'core/host/appservice.bicep' = {
       AZURE_OPENAI_SYSTEM_MESSAGE: openAISystemMessage
       AZURE_OPENAI_PREVIEW_API_VERSION: openAIApiVersion
       AZURE_OPENAI_STREAM: openAIStream
+      // cosmos DB
+
+      
     }
   }
 }

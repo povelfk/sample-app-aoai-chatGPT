@@ -9,15 +9,15 @@ param environmentName string
 @description('Primary location for all resources')
 param location string
 
-param appServicePlanName string = ''
-param backendServiceName string = ''
+param appServicePlanName string = 'app-service-plan-${environmentName}' // changed
+param backendServiceName string = 'webapp-${environmentName}' // changed
 param resourceGroupName string = ''
 
-param searchServiceName string = ''
+param searchServiceName string = 'search-${environmentName}' // changed
 param searchServiceResourceGroupName string = ''
-param searchServiceResourceGroupLocation string = location
+param searchServiceResourceGroupLocation string = 'westeurope'
 param searchServiceSkuName string = ''
-param searchIndexName string = 'digge-index'
+param searchIndexName string = 'index-${environmentName}' // changed
 param searchUseSemanticSearch bool = true
 param searchSemanticSearchConfig string = 'default'
 param searchTopK int = 5
@@ -27,7 +27,7 @@ param searchFilenameColumn string = 'filepath'
 param searchTitleColumn string = 'title'
 param searchUrlColumn string = 'url'
 
-param openAiResourceName string = ''
+param openAiResourceName string = 'aoai-${environmentName}' // changed
 param openAiResourceGroupName string = ''
 param openAiResourceGroupLocation string = 'swedencentral'
 param openAiSkuName string = ''

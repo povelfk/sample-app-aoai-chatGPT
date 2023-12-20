@@ -44,7 +44,7 @@ param embeddingDeploymentName string = 'text-embedding-ada-002'
 param embeddingModelName string = 'text-embedding-ada-002'
 
 // Used by prepdocs.py: Form recognizer
-param formRecognizerServiceName string = ''
+param formRecognizerServiceName string = 'document-intelligence-${environmentName}'
 param formRecognizerResourceGroupName string = ''
 param formRecognizerResourceGroupLocation string = location
 param formRecognizerSkuName string = ''

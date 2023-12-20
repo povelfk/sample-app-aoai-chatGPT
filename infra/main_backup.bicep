@@ -7,16 +7,15 @@ param environmentName string
 
 @minLength(1)
 @description('Primary location for all resources')
-param location string = 'swedencentral'
+param location string
 
-param appServicePlanName string = 'digge-test-sweden-plan-2' // changed
-param appServiceName string = 'digge-test-sweden-2' // added
-// param backendServiceName string = ''
-param resourceGroupName string = 'rg-digge-sweden-2' // changed
+param appServicePlanName string = ''
+param backendServiceName string = ''
+param resourceGroupName string = ''
 
-param searchServiceName string = 'digge-search'
-param searchServiceResourceGroupName string = 'rg-digge-sweden-2'
-param searchServiceResourceGroupLocation string = 'westeurope'
+param searchServiceName string = 'cog-search-jd5ypzfx2l6vi'
+param searchServiceResourceGroupName string = 'rg-rv-chatbot'
+param searchServiceResourceGroupLocation string = location
 param searchServiceSkuName string = 'standard'
 param searchIndexName string = 'digge-final'
 param searchUseSemanticSearch bool = true
@@ -28,8 +27,8 @@ param searchFilenameColumn string = 'filepath'
 param searchTitleColumn string = 'title'
 param searchUrlColumn string = 'url'
 
-param openAiResourceName string = 'digge-aoai'
-param openAiResourceGroupName string = 'rg-digge-sweden-2'
+param openAiResourceName string = 'rv-chatbot-aoai'
+param openAiResourceGroupName string = 'rg-rv-chatbot'
 param openAiResourceGroupLocation string = 'swedencentral'
 param openAiSkuName string = 'Standard'
 param openAIModel string = 'gpt-35-turbo-16k'
@@ -56,7 +55,7 @@ param authClientId string
 param authClientSecret string
 
 // Used for Cosmos DB
-param cosmosAccountName string = 'digge-cosmosdb-2' //changed
+param cosmosAccountName string = ''
 
 @description('Id of the user or app to assign application roles')
 param principalId string = ''
@@ -98,7 +97,7 @@ module appServicePlan 'core/host/appserviceplan.bicep' = {
 }
 
 // The application frontend
-// var appServiceName = !empty(backendServiceName) ? backendServiceName : '${abbrs.webSitesAppService}backend-${resourceToken}'
+var appServiceName = !empty(backendServiceName) ? backendServiceName : '${abbrs.webSitesAppService}backend-${resourceToken}'
 var authIssuerUri = '${environment().authentication.loginEndpoint}${tenant().tenantId}/v2.0'
 module backend 'core/host/appservice.bicep' = {
   name: 'web'
@@ -141,10 +140,7 @@ module backend 'core/host/appservice.bicep' = {
       AZURE_OPENAI_PREVIEW_API_VERSION: openAIApiVersion
       AZURE_OPENAI_STREAM: openAIStream
       // cosmos DB
-      // AZURE_COSMOSDB_ACCOUNT: cosmos.oututs.accountName
-      // AZURE_COSMOSDB_DATABASE: cosmos.outputs.databaseName
-      // AZURE_COSMOSDB_CONVERSATIONS_CONTAINER: cosmos.outputs.containerName
-      // AZURE_COSMOSDB_ACCOUNT_KEY: cosmos.outputs.accountKey
+
       
     }
   }
@@ -209,7 +205,7 @@ module cosmos 'db.bicep' = {
   scope: resourceGroup
   params: {
     accountName: !empty(cosmosAccountName) ? cosmosAccountName : '${abbrs.documentDBDatabaseAccounts}${resourceToken}'
-    location: location
+    location: 'westeurope'
     tags: tags
     principalIds: [principalId, backend.outputs.identityPrincipalId]
   }

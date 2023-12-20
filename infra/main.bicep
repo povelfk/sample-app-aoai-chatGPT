@@ -13,11 +13,11 @@ param appServicePlanName string = ''
 param backendServiceName string = ''
 param resourceGroupName string = ''
 
-param searchServiceName string = 'cog-search-jd5ypzfx2l6vi'
-param searchServiceResourceGroupName string = 'rg-rv-chatbot'
+param searchServiceName string = ''
+param searchServiceResourceGroupName string = ''
 param searchServiceResourceGroupLocation string = location
-param searchServiceSkuName string = 'standard'
-param searchIndexName string = 'digge-final'
+param searchServiceSkuName string = ''
+param searchIndexName string = 'digge-index'
 param searchUseSemanticSearch bool = true
 param searchSemanticSearchConfig string = 'default'
 param searchTopK int = 5
@@ -27,10 +27,10 @@ param searchFilenameColumn string = 'filepath'
 param searchTitleColumn string = 'title'
 param searchUrlColumn string = 'url'
 
-param openAiResourceName string = 'rv-chatbot-aoai'
-param openAiResourceGroupName string = 'rg-rv-chatbot'
+param openAiResourceName string = ''
+param openAiResourceGroupName string = ''
 param openAiResourceGroupLocation string = 'swedencentral'
-param openAiSkuName string = 'Standard'
+param openAiSkuName string = ''
 param openAIModel string = 'gpt-35-turbo-16k'
 param openAIModelName string = 'gpt-35-turbo-16k'
 param openAITemperature int = 0
@@ -141,7 +141,7 @@ module backend 'core/host/appservice.bicep' = {
       AZURE_OPENAI_STREAM: openAIStream
       // cosmos DB
 
-      
+
     }
   }
 }

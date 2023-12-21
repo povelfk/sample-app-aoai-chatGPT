@@ -1,6 +1,6 @@
 az webapp up `
     --subscription ME-MngEnvMCAP854902-povelf-2 `
-    --resource-group rg-digge-sweden `
+    --resource-group rg-digge2 `
     --name digge-test-sweden `
     --plan digge_test_sweden_plan `
     --location swedencentral `

@@ -13,6 +13,8 @@ from azure.identity import AzureCliCredential
 from azure.search.documents import SearchClient
 from tqdm import tqdm
 
+import uuid
+
 from data_utils import chunk_directory, chunk_blob_container
 
 SUPPORTED_LANGUAGE_CODES = {
@@ -255,20 +257,20 @@ def create_or_update_search_index(
 def upload_documents_to_index(service_name, subscription_id, resource_group, index_name, docs, credential=None, upload_batch_size = 50, admin_key=None):
     if credential is None and admin_key is None:
         raise ValueError("credential and admin_key cannot be None")
-    
     to_upload_dicts = []
 
-    id = 0
+    # id = 0
     for d in docs:
         if type(d) is not dict:
             d = dataclasses.asdict(d)
         # add id to documents
+        id=d["url"] + json.loads(d["metadata"])["chunk_id"] # url + chunk_id
+        id=uuid.uuid5(uuid.NAMESPACE_DNS, id) # Generate a UUID from a string
         d.update({"@search.action": "upload", "id": str(id)})
         if "contentVector" in d and d["contentVector"] is None:
             del d["contentVector"]
         to_upload_dicts.append(d)
-        id += 1
-    
+        # id += 1
     
     endpoint = "https://{}.search.windows.net/".format(service_name)
     if not admin_key:

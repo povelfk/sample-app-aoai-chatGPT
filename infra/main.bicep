@@ -15,7 +15,7 @@ param resourceGroupName string = ''
 
 param searchServiceName string = 'search-${environmentName}' // changed
 param searchServiceResourceGroupName string = ''
-param searchServiceResourceGroupLocation string = 'westeurope'
+param searchServiceResourceGroupLocation string = 'westeurope' // hard coded
 param searchServiceSkuName string = ''
 param searchIndexName string = 'index-${environmentName}' // changed
 param searchUseSemanticSearch bool = true
@@ -29,7 +29,7 @@ param searchUrlColumn string = 'url'
 
 param openAiResourceName string = 'aoai-${environmentName}' // changed
 param openAiResourceGroupName string = ''
-param openAiResourceGroupLocation string = 'swedencentral'
+param openAiResourceGroupLocation string = 'swedencentral' // hard coded
 param openAiSkuName string = ''
 param openAIModel string = 'gpt-35-turbo-16k'
 param openAIModelName string = 'gpt-35-turbo-16k'
@@ -44,7 +44,7 @@ param embeddingDeploymentName string = 'text-embedding-ada-002'
 param embeddingModelName string = 'text-embedding-ada-002'
 
 // Used by prepdocs.py: Form recognizer
-param formRecognizerServiceName string = 'document-intelligence-${environmentName}'
+param formRecognizerServiceName string = 'document-intelligence-${environmentName}' // changed
 param formRecognizerResourceGroupName string = ''
 param formRecognizerResourceGroupLocation string = location
 param formRecognizerSkuName string = ''
@@ -205,7 +205,7 @@ module cosmos 'db.bicep' = {
   scope: resourceGroup
   params: {
     accountName: !empty(cosmosAccountName) ? cosmosAccountName : '${abbrs.documentDBDatabaseAccounts}${resourceToken}'
-    location: 'westeurope'
+    location: 'westeurope' // hard coded
     tags: tags
     principalIds: [principalId, backend.outputs.identityPrincipalId]
   }

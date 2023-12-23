@@ -11,3 +11,5 @@ scripts/config2.json
 set_env.ps1
 .azure
 secrets.txt
+scripts/synonym_map_create.ipynb
+scripts/synonym_map_test.ipynb

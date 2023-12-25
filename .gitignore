@@ -13,3 +13,4 @@ set_env.ps1
 secrets.txt
 scripts/synonym_map_create.ipynb
 scripts/synonym_map_test.ipynb
+scripts/synonym_map_OYD.ipynb

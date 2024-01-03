@@ -15,3 +15,5 @@ scripts/synonym_map_create.ipynb
 scripts/synonym_map_test.ipynb
 scripts/synonym_map_OYD.ipynb
 scripts/notebooks/
+infra_rg/
+03-deploy-bicep.ps1

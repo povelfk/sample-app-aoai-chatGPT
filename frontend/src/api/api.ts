@@ -297,3 +297,23 @@ export const historyEnsure = async (): Promise<CosmosDBHealth> => {
     return response;
 }
 
+export const getBlobSasUrl = async(path: string): Promise<string> =>{
+
+    
+    const response = await fetch("/blob-sas-url?" + new URLSearchParams({ bloburl: path}), {
+        method: "GET",
+        
+        
+    })
+    .then(async res => {
+        let respJson = await res.json();
+        if(respJson.sas_url){
+            return respJson.sas_url
+        }
+    })
+    .catch((err) => {
+        console.error("There was an issue fetching your data.");
+        return err;
+    })
+   return response;
+}

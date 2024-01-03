@@ -113,6 +113,9 @@ ELASTICSEARCH_VECTOR_COLUMNS = os.environ.get("ELASTICSEARCH_VECTOR_COLUMNS")
 ELASTICSEARCH_STRICTNESS = os.environ.get("ELASTICSEARCH_STRICTNESS", SEARCH_STRICTNESS)
 ELASTICSEARCH_EMBEDDING_MODEL_ID = os.environ.get("ELASTICSEARCH_EMBEDDING_MODEL_ID")
 
+
+AZURE_STORAGE_ACCOUNT_KEY = os.environ.get("AZURE_STORAGE_ACCOUNT_KEY")
+
 # Initialize a CosmosDB client with AAD auth and containers for Chat History
 cosmos_conversation_client = None
 if AZURE_COSMOSDB_DATABASE and AZURE_COSMOSDB_ACCOUNT and AZURE_COSMOSDB_CONVERSATIONS_CONTAINER:
@@ -576,6 +579,22 @@ def conversation_without_data(request_body):
     else:
         return Response(stream_without_data(response, history_metadata), mimetype='text/event-stream')
 
+@app.route("/blob-sas-url", methods=["GET", "POST"])
+def get_blob_sas_url():
+    from azure.storage.blob import generate_blob_sas, BlobSasPermissions, BlobClient
+    from datetime import datetime, timedelta
+    blob_url = request.args.get("bloburl")
+
+    blob_client = BlobClient.from_blob_url(blob_url)
+    sas_url = generate_blob_sas(account_name=blob_client.account_name,
+                      account_key=AZURE_STORAGE_ACCOUNT_KEY,
+                      container_name=blob_client.container_name,
+                      blob_name=blob_client.blob_name,
+                      permission=BlobSasPermissions(read=True),
+                      expiry= datetime.utcnow() + timedelta(minutes=5))
+
+    return jsonify({"sas_url": blob_url + "?" + sas_url}), 200
+  
 
 @app.route("/conversation", methods=["GET", "POST"])
 def conversation():

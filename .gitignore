@@ -16,4 +16,6 @@ scripts/synonym_map_test.ipynb
 scripts/synonym_map_OYD.ipynb
 scripts/notebooks/
 infra_rg/
+01-deploy-webapp.ps1
+02-set-app-settings.ps1
 03-deploy-bicep.ps1

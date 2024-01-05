@@ -156,12 +156,15 @@ def create_or_update_search_index(
                 capture_output=True,
             ).stdout
         )["primaryKey"]
-
-    url = f"https://{service_name}.search.windows.net/indexes/{index_name}?api-version=2023-07-01-Preview"
+    
+    search_api_version = "2023-11-01" #"2023-07-01-Preview"
+    url = f"https://{service_name}.search.windows.net/indexes/{index_name}?api-version={search_api_version}"
     headers = {
         "Content-Type": "application/json",
         "api-key": admin_key,
     }
+
+    my_default_vector_profile="my-default-vector-profile"
 
     body = {
         "fields": [
@@ -184,18 +187,18 @@ def create_or_update_search_index(
                 "name": "title",
                 "type": "Edm.String",
                 "searchable": True,
-                "sortable": False,
+                "sortable": True,
                 "facetable": False,
-                "filterable": False,
+                "filterable": True,
                 "analyzer": f"{language}.lucene" if language else None,
             },
             {
                 "name": "filepath",
                 "type": "Edm.String",
                 "searchable": True,
-                "sortable": False,
+                "sortable": True,
                 "facetable": False,
-                "filterable": False,
+                "filterable": True,
             },
             {
                 "name": "url",
@@ -207,7 +210,35 @@ def create_or_update_search_index(
                 "type": "Edm.String",
                 "searchable": True,
             },
+            {
+                "name": "contentVector",
+                "type": "Collection(Edm.Single)",
+                "searchable": True,
+                "retrievable": True,
+                "dimensions": 1536,
+                "vectorSearchProfile": my_default_vector_profile
+            }
         ],
+        "vectorSearch": {
+            "algorithms": [
+                {
+                    "name": vector_config_name,
+                    "kind": "hnsw",
+                    "hnswParameters": {
+                        "m": 4,
+                        "efConstruction": 400,
+                        "efSearch": 500,
+                        "metric": "cosine"
+                    }
+                }
+            ],
+            "profiles": [
+                {
+                    "name": my_default_vector_profile,
+                    "algorithm": vector_config_name
+                }
+            ]
+        },
         "suggesters": [],
         "scoringProfiles": [],
         "semantic": {
@@ -223,25 +254,6 @@ def create_or_update_search_index(
             ]
         },
     }
-
-    if vector_config_name:
-        body["fields"].append({
-            "name": "contentVector",
-            "type": "Collection(Edm.Single)",
-            "searchable": True,
-            "retrievable": True,
-            "dimensions": 1536,
-            "vectorSearchConfiguration": vector_config_name
-        })
-
-        body["vectorSearch"] = {
-            "algorithmConfigurations": [
-                {
-                    "name": vector_config_name,
-                    "kind": "hnsw"
-                }
-            ]
-        }
 
     response = requests.put(url, json=body, headers=headers)
     if response.status_code == 201:

@@ -12,9 +12,24 @@ from dotenv import load_dotenv
 from backend.auth.auth_utils import get_authenticated_user_details
 from backend.history.cosmosdbservice import CosmosConversationClient
 
+from azure.monitor.opentelemetry import configure_azure_monitor
+
 load_dotenv()
 
 app = Flask(__name__, static_folder="static")
+
+# Configure OpenTelemetry to use Azure Monitor with the specified connection string.
+configure_azure_monitor(
+    connection_string=os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"),
+    disable_tracing=True,
+    disable_logging=False,
+    disable_metrics=False,
+    instrumentation_options={
+        "azure_sdk": {"enabled": True},
+        "flask": {"enabled": True},
+        "django": {"enabled": False},
+    }
+)
 
 # Static Files
 @app.route("/")

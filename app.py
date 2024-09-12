@@ -6,7 +6,7 @@ import openai
 import copy
 from azure.identity import DefaultAzureCredential
 from base64 import b64encode
-from flask import Flask, Response, request, jsonify, send_from_directory
+from flask import Flask, Response, request, jsonify, send_from_directory, session
 from dotenv import load_dotenv
 
 from backend.auth.auth_utils import get_authenticated_user_details
@@ -14,22 +14,98 @@ from backend.history.cosmosdbservice import CosmosConversationClient
 
 from azure.monitor.opentelemetry import configure_azure_monitor
 
+# Importing from common.helper
+from common.helper import (
+    # is_json,
+    check_missing_parameters,
+    ask_follow_up_question,
+    ask_confirmation_question,
+    classify,
+    call_function,
+    count_tokens,
+    generate_static_message
+)
+
 load_dotenv()
 
 app = Flask(__name__, static_folder="static")
+app.secret_key = os.environ.get("FLASK_KEY")
 
-# Configure OpenTelemetry to use Azure Monitor with the specified connection string.
-configure_azure_monitor(
-    connection_string=os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"),
-    disable_tracing=True,
-    disable_logging=False,
-    disable_metrics=False,
-    instrumentation_options={
-        "azure_sdk": {"enabled": True},
-        "flask": {"enabled": True},
-        "django": {"enabled": False},
-    }
-)
+# # Configure OpenTelemetry to use Azure Monitor with the specified connection string.
+# configure_azure_monitor(
+#     connection_string=os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"),
+#     disable_tracing=True,
+#     disable_logging=False,
+#     disable_metrics=False,
+#     instrumentation_options={
+#         "azure_sdk": {"enabled": True},
+#         "flask": {"enabled": True},
+#         "django": {"enabled": False},
+#     }
+# )
+
+class ConversationHandler:
+    def __init__(self):
+        self.MAX_TOKENS = 50000 #16384
+        self.function_requires_confirmation = {
+            '4': True,
+            '5': True,
+            '6': True,
+            '7': True
+        } # functions that requires confirmation
+
+    def conversation_internal(self, request_body):
+
+        # initialize session variables, if not already present
+        if 'user_confirmation' not in session:
+            session['user_confirmation'] = False
+
+        CURRENT_TOKEN_COUNT = count_tokens(AZURE_OPENAI_SYSTEM_MESSAGE_CLASSIFIER, request_body)
+        print(f"CURRENT_TOKEN_COUNT: {CURRENT_TOKEN_COUNT}")
+        if CURRENT_TOKEN_COUNT > self.MAX_TOKENS:
+            return generate_static_message("Du har nått maxgränsen av antal ord, vänligen starta en ny konversation.", request_body)
+        
+        # classify the user input
+        classification_result = classify(request_body)
+        if isinstance(classification_result, str):  # Check if the result is a string (error message)
+            return generate_static_message(classification_result, request_body)
+        else:
+            function_to_call, parameters, is_function, classification_message = classification_result
+            if is_function:
+                missing_params = check_missing_parameters(parameters)
+                if missing_params:
+                    follow_up_question = ask_follow_up_question(missing_params, function_to_call, classification_message, request_body)
+                    return follow_up_question
+                else:
+                    function_augmented_prompt = None  # Initialize variable outside the if-else scope for clarity
+
+                    if self.function_requires_confirmation.get(function_to_call, False):
+                        request_body = request.get_json()
+                        latest_user_message = request_body["messages"][-1]["content"].lower()
+
+                        if latest_user_message == "nej":
+                            return generate_static_message("Ok, jag avbryter processen.", request_body)
+                        elif latest_user_message != "ja":
+                            return ask_confirmation_question(parameters, classification_message, function_to_call, request_body)
+                        
+                        session['user_confirmation'] = True
+                        function_augmented_prompt = call_function(function_to_call, parameters)
+                        session['user_confirmation'] = False
+                    else:
+                        function_augmented_prompt = call_function(function_to_call, parameters)
+                    return conversation_without_data(request_body, function_augmented_prompt)
+            else:
+                try:
+                    use_data = should_use_data()
+                    if use_data:
+                        return conversation_with_data(request_body)
+                    else:
+                        return conversation_without_data(request_body)
+                except Exception as e:
+                    logging.exception("Exception in /conversation")
+                    return jsonify({"error": str(e)}), 500
+
+handler = ConversationHandler()
 
 # Static Files
 @app.route("/")
@@ -51,7 +127,7 @@ if DEBUG_LOGGING:
     logging.basicConfig(level=logging.DEBUG)
 
 # On Your Data Settings
-DATASOURCE_TYPE = os.environ.get("DATASOURCE_TYPE", "AzureCognitiveSearch")
+DATASOURCE_TYPE = os.environ.get("DATASOURCE_TYPE", "azure_search") # CHANGE AzureCognitiveSearch
 SEARCH_TOP_K = os.environ.get("SEARCH_TOP_K", 5)
 SEARCH_STRICTNESS = os.environ.get("SEARCH_STRICTNESS", 3)
 SEARCH_ENABLE_IN_DOMAIN = os.environ.get("SEARCH_ENABLE_IN_DOMAIN", "true")
@@ -82,8 +158,12 @@ AZURE_OPENAI_TEMPERATURE = os.environ.get("AZURE_OPENAI_TEMPERATURE", 0)
 AZURE_OPENAI_TOP_P = os.environ.get("AZURE_OPENAI_TOP_P", 1.0)
 AZURE_OPENAI_MAX_TOKENS = os.environ.get("AZURE_OPENAI_MAX_TOKENS", 1000)
 AZURE_OPENAI_STOP_SEQUENCE = os.environ.get("AZURE_OPENAI_STOP_SEQUENCE")
-AZURE_OPENAI_SYSTEM_MESSAGE = os.environ.get("AZURE_OPENAI_SYSTEM_MESSAGE", "You are an AI assistant that helps people find information.")
-AZURE_OPENAI_PREVIEW_API_VERSION = os.environ.get("AZURE_OPENAI_PREVIEW_API_VERSION", "2023-08-01-preview")
+# AZURE_OPENAI_SYSTEM_MESSAGE = os.environ.get("AZURE_OPENAI_SYSTEM_MESSAGE", "You are an AI assistant that helps people find information.")
+with open('prompts/system_message_chat.txt', 'r', encoding='utf-8') as file:
+    AZURE_OPENAI_SYSTEM_MESSAGE_CHAT = file.read()
+with open('prompts/system_message_custom_classifier.txt', 'r', encoding='utf-8') as file:
+    AZURE_OPENAI_SYSTEM_MESSAGE_CLASSIFIER = file.read()
+AZURE_OPENAI_PREVIEW_API_VERSION = os.environ.get("AZURE_OPENAI_PREVIEW_API_VERSION", "2024-02-01")
 AZURE_OPENAI_STREAM = os.environ.get("AZURE_OPENAI_STREAM", "true")
 AZURE_OPENAI_MODEL_NAME = os.environ.get("AZURE_OPENAI_MODEL_NAME", "gpt-35-turbo-16k") # Name of the model, e.g. 'gpt-35-turbo-16k' or 'gpt-4'
 AZURE_OPENAI_EMBEDDING_ENDPOINT = os.environ.get("AZURE_OPENAI_EMBEDDING_ENDPOINT")
@@ -215,21 +295,29 @@ def generateFilterString(userToken):
     return f"{AZURE_SEARCH_PERMITTED_GROUPS_COLUMN}/any(g:search.in(g, '{group_ids}'))"
 
 
-
 def prepare_body_headers_with_data(request):
     request_messages = request.json["messages"]
+    refined_request_message = []
+    for message in request_messages:
+        refined_request_message.append(
+            {
+                'role': message["role"],
+                'content': message["content"]
+            }
+        )
 
     body = {
-        "messages": request_messages,
+        "messages": refined_request_message,
         "temperature": float(AZURE_OPENAI_TEMPERATURE),
         "max_tokens": int(AZURE_OPENAI_MAX_TOKENS),
         "top_p": float(AZURE_OPENAI_TOP_P),
         "stop": AZURE_OPENAI_STOP_SEQUENCE.split("|") if AZURE_OPENAI_STOP_SEQUENCE else None,
         "stream": SHOULD_STREAM,
-        "dataSources": []
+        "data_sources": [],
+        "seed": 42
     }
 
-    if DATASOURCE_TYPE == "AzureCognitiveSearch":
+    if DATASOURCE_TYPE == "azure_search": # CHANGE AzureCognitiveSearch
         # Set query type
         query_type = "simple"
         if AZURE_SEARCH_QUERY_TYPE:
@@ -249,27 +337,38 @@ def prepare_body_headers_with_data(request):
             if DEBUG_LOGGING:
                 logging.debug(f"FILTER: {filter}")
 
-        body["dataSources"].append(
+        body["data_sources"].append(
             {
-                "type": "AzureCognitiveSearch",
+                "type": "azure_search", # CHANGE AzureCognitiveSearch
                 "parameters": {
-                    "endpoint": f"https://{AZURE_SEARCH_SERVICE}.search.windows.net",
-                    "key": AZURE_SEARCH_KEY,
-                    "indexName": AZURE_SEARCH_INDEX,
-                    "fieldsMapping": {
-                        "contentFields": AZURE_SEARCH_CONTENT_COLUMNS.split("|") if AZURE_SEARCH_CONTENT_COLUMNS else [],
-                        "titleField": AZURE_SEARCH_TITLE_COLUMN if AZURE_SEARCH_TITLE_COLUMN else None,
-                        "urlField": AZURE_SEARCH_URL_COLUMN if AZURE_SEARCH_URL_COLUMN else None,
-                        "filepathField": AZURE_SEARCH_FILENAME_COLUMN if AZURE_SEARCH_FILENAME_COLUMN else None,
-                        "vectorFields": AZURE_SEARCH_VECTOR_COLUMNS.split("|") if AZURE_SEARCH_VECTOR_COLUMNS else []
+                    "authentication": {
+                        "key": AZURE_SEARCH_KEY,
+                        "type": "api_key"
                     },
-                    "inScope": True if AZURE_SEARCH_ENABLE_IN_DOMAIN.lower() == "true" else False,
-                    "topNDocuments": AZURE_SEARCH_TOP_K,
-                    "queryType": query_type,
-                    "semanticConfiguration": AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG if AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG else "",
-                    "roleInformation": AZURE_OPENAI_SYSTEM_MESSAGE,
+                    "endpoint": f"https://{AZURE_SEARCH_SERVICE}.search.windows.net",
+                    "index_name": AZURE_SEARCH_INDEX,
+                    "in_scope": True if AZURE_SEARCH_ENABLE_IN_DOMAIN.lower() == "true" else False,
+                    "top_n_documents": AZURE_SEARCH_TOP_K,
+                    "query_type": query_type, # vector_semantic_hybrid CHANGE
+                    "semantic_configuration": AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG if AZURE_SEARCH_SEMANTIC_SEARCH_CONFIG else "",
+                    "role_information": AZURE_OPENAI_SYSTEM_MESSAGE_CHAT,
                     "filter": filter,
-                    "strictness": int(AZURE_SEARCH_STRICTNESS)
+                    "strictness": int(AZURE_SEARCH_STRICTNESS),
+                    "embedding_dependency": {
+                        "type": "endpoint",
+                        "endpoint": AZURE_OPENAI_EMBEDDING_ENDPOINT,
+                        "authentication": {
+                            "key": AZURE_OPENAI_KEY,
+                            "type": "api_key"
+                        }
+                    },
+                    "fields_mapping": {
+                        "content_fields": AZURE_SEARCH_CONTENT_COLUMNS.split("|") if AZURE_SEARCH_CONTENT_COLUMNS else [],
+                        "title_field": AZURE_SEARCH_TITLE_COLUMN if AZURE_SEARCH_TITLE_COLUMN else None,
+                        "url_field": AZURE_SEARCH_URL_COLUMN if AZURE_SEARCH_URL_COLUMN else None,
+                        "filepath_field": AZURE_SEARCH_FILENAME_COLUMN if AZURE_SEARCH_FILENAME_COLUMN else None,
+                        "vector_fields": AZURE_SEARCH_VECTOR_COLUMNS.split("|") if AZURE_SEARCH_VECTOR_COLUMNS else []
+                    }
                 }
             })
     elif DATASOURCE_TYPE == "AzureCosmosDB":
@@ -295,7 +394,7 @@ def prepare_body_headers_with_data(request):
                     "topNDocuments": AZURE_COSMOSDB_MONGO_VCORE_TOP_K,
                     "strictness": int(AZURE_COSMOSDB_MONGO_VCORE_STRICTNESS),
                     "queryType": query_type,
-                    "roleInformation": AZURE_OPENAI_SYSTEM_MESSAGE
+                    "roleInformation": AZURE_OPENAI_SYSTEM_MESSAGE_CHAT
                 }
             }
         )
@@ -326,7 +425,7 @@ def prepare_body_headers_with_data(request):
                             "inScope": True if ELASTICSEARCH_ENABLE_IN_DOMAIN.lower() == "true" else False,
                             "topNDocuments": int(ELASTICSEARCH_TOP_K),
                             "queryType": ELASTICSEARCH_QUERY_TYPE,
-                            "roleInformation": AZURE_OPENAI_SYSTEM_MESSAGE,
+                            "roleInformation": AZURE_OPENAI_SYSTEM_MESSAGE_CHAT,
                             "embeddingEndpoint": AZURE_OPENAI_EMBEDDING_ENDPOINT,
                             "embeddingKey": AZURE_OPENAI_EMBEDDING_KEY,
                             "embeddingModelId": ELASTICSEARCH_EMBEDDING_MODEL_ID,
@@ -339,21 +438,29 @@ def prepare_body_headers_with_data(request):
     else:
         raise Exception(f"DATASOURCE_TYPE is not configured or unknown: {DATASOURCE_TYPE}")
 
-    if "vector" in query_type.lower():
-        if AZURE_OPENAI_EMBEDDING_NAME:
-            body["dataSources"][0]["parameters"]["embeddingDeploymentName"] = AZURE_OPENAI_EMBEDDING_NAME
-        else:
-            body["dataSources"][0]["parameters"]["embeddingEndpoint"] = AZURE_OPENAI_EMBEDDING_ENDPOINT
-            body["dataSources"][0]["parameters"]["embeddingKey"] = AZURE_OPENAI_EMBEDDING_KEY
+    # CHANGE
+    # if "vector" in query_type.lower():
+        # if AZURE_OPENAI_EMBEDDING_NAME:
+            # body["dataSources"][0]["parameters"]["embeddingDeploymentName"] = AZURE_OPENAI_EMBEDDING_NAME
+        # else:
+            # body["dataSources"][0]["parameters"]["embeddingEndpoint"] = AZURE_OPENAI_EMBEDDING_ENDPOINT
+            # body["dataSources"][0]["parameters"]["embeddingKey"] = AZURE_OPENAI_EMBEDDING_KEY
 
+    # CHANGE
     if DEBUG_LOGGING:
         body_clean = copy.deepcopy(body)
-        if body_clean["dataSources"][0]["parameters"].get("key"):
-            body_clean["dataSources"][0]["parameters"]["key"] = "*****"
-        if body_clean["dataSources"][0]["parameters"].get("connectionString"):
-            body_clean["dataSources"][0]["parameters"]["connectionString"] = "*****"
-        if body_clean["dataSources"][0]["parameters"].get("embeddingKey"):
-            body_clean["dataSources"][0]["parameters"]["embeddingKey"] = "*****"
+        if body_clean["data_source"][0]["parameters"].get("key"):
+            body_clean["data_source"][0]["parameters"]["key"] = "*****"
+        if body_clean["data_source"][0]["parameters"].get("connection_string"):
+            body_clean["data_source"][0]["parameters"]["connection_string"] = "*****"
+        if body_clean["data_source"][0]["parameters"].get("embedding_key"):
+            body_clean["data_source"][0]["parameters"]["embedding_key"] = "*****"
+        # if body_clean["dataSources"][0]["parameters"].get("key"):
+        #     body_clean["dataSources"][0]["parameters"]["key"] = "*****"
+        # if body_clean["dataSources"][0]["parameters"].get("connectionString"):
+        #     body_clean["dataSources"][0]["parameters"]["connectionString"] = "*****"
+        # if body_clean["dataSources"][0]["parameters"].get("embeddingKey"): 
+        #     body_clean["dataSources"][0]["parameters"]["embeddingKey"] = "*****" 
             
         logging.debug(f"REQUEST BODY: {json.dumps(body_clean, indent=4)}")
 
@@ -461,22 +568,33 @@ def formatApiResponseStreaming(rawResponse):
             "messages": []
         }],
     }
-
     if rawResponse["choices"][0]["delta"].get("context"):
-        messageObj = {
-            "delta": {
-                "role": "tool",
-                "content": rawResponse["choices"][0]["delta"]["context"]["messages"][0]["content"]
+        if len(rawResponse["choices"][0]["delta"]["context"]["citations"])>0:
+            content = rawResponse["choices"][0]["delta"]["context"]["citations"]
+            intent = json.loads(rawResponse["choices"][0]["delta"]["context"]["intent"])
+            # print(f"content: {content}")
+            # print(f"intent: {intent}")
+            messageObj = {
+                "delta": {
+                    "role": "tool",
+                    "content": json.dumps({
+                        "citations": content,
+                        "intent": intent
+                    })
+                }
             }
-        }
-        response["choices"][0]["messages"].append(messageObj)
-    elif rawResponse["choices"][0]["delta"].get("role"):
-        messageObj = {
-            "delta": {
-                "role": "assistant",
+        else:
+            messageObj = {
+                "delta": {
+                    "role": "tool",
+                    "content": str({
+                        "citations": [],
+                        "intent": str([])
+                    })
+                }
             }
-        }
         response["choices"][0]["messages"].append(messageObj)
+
     else:
         if rawResponse["choices"][0]["end_turn"]:
             messageObj = {
@@ -492,13 +610,16 @@ def formatApiResponseStreaming(rawResponse):
                 }
             }
             response["choices"][0]["messages"].append(messageObj)
-
+    # print(f"response: {response}")
+    # print()
     return response
 
 def conversation_with_data(request_body):
     body, headers = prepare_body_headers_with_data(request)
     base_url = AZURE_OPENAI_ENDPOINT if AZURE_OPENAI_ENDPOINT else f"https://{AZURE_OPENAI_RESOURCE}.openai.azure.com/"
-    endpoint = f"{base_url}openai/deployments/{AZURE_OPENAI_MODEL}/extensions/chat/completions?api-version={AZURE_OPENAI_PREVIEW_API_VERSION}"
+    # CHANGE
+    # endpoint = f"{base_url}openai/deployments/{AZURE_OPENAI_MODEL}/extensions/chat/completions?api-version={AZURE_OPENAI_PREVIEW_API_VERSION}"
+    endpoint = f"{base_url}openai/deployments/{AZURE_OPENAI_MODEL}/chat/completions?api-version={AZURE_OPENAI_PREVIEW_API_VERSION}"
     history_metadata = request_body.get("history_metadata", {})
 
     if not SHOULD_STREAM:
@@ -518,19 +639,19 @@ def conversation_with_data(request_body):
 
 def stream_without_data(response, history_metadata={}):
     responseText = ""
-    for line in response:
-        if line["choices"]:
-            deltaText = line["choices"][0]["delta"].get('content')
+    for i, line in enumerate(response):
+        if len(line.choices)>0:
+            deltaText = line.choices[0].delta.content
         else:
             deltaText = ""
         if deltaText and deltaText != "[DONE]":
             responseText = deltaText
 
         response_obj = {
-            "id": line["id"],
-            "model": line["model"],
-            "created": line["created"],
-            "object": line["object"],
+            "id": line.id,
+            "model": line.model,
+            "created": line.created,
+            "object": line.object,
             "choices": [{
                 "messages": [{
                     "role": "assistant",
@@ -541,35 +662,20 @@ def stream_without_data(response, history_metadata={}):
         }
         yield format_as_ndjson(response_obj)
 
+def conversation_without_data(request_body, function_augmented_prompt):
+    key = AZURE_OPENAI_KEY
+    api_version = AZURE_OPENAI_PREVIEW_API_VERSION
+    base_url = AZURE_OPENAI_ENDPOINT if AZURE_OPENAI_ENDPOINT else f"https://{AZURE_OPENAI_RESOURCE}.openai.azure.com/"
 
-def conversation_without_data(request_body):
-    openai.api_type = "azure"
-    openai.api_base = AZURE_OPENAI_ENDPOINT if AZURE_OPENAI_ENDPOINT else f"https://{AZURE_OPENAI_RESOURCE}.openai.azure.com/"
-    openai.api_version = "2023-08-01-preview"
-    openai.api_key = AZURE_OPENAI_KEY
+    client = openai.AzureOpenAI(
+        api_key=key,
+        api_version=api_version,
+        azure_endpoint=base_url
+    )
 
-    request_messages = request_body["messages"]
-    messages = [
-        {
-            "role": "system",
-            "content": AZURE_OPENAI_SYSTEM_MESSAGE
-        }
-    ]
-
-    for message in request_messages:
-        if message:
-            messages.append({
-                "role": message["role"] ,
-                "content": message["content"]
-            })
-
-    response = openai.ChatCompletion.create(
-        engine=AZURE_OPENAI_MODEL,
-        messages = messages,
-        temperature=float(AZURE_OPENAI_TEMPERATURE),
-        max_tokens=int(AZURE_OPENAI_MAX_TOKENS),
-        top_p=float(AZURE_OPENAI_TOP_P),
-        stop=AZURE_OPENAI_STOP_SEQUENCE.split("|") if AZURE_OPENAI_STOP_SEQUENCE else None,
+    response = client.chat.completions.create(
+        model=AZURE_OPENAI_MODEL,
+        messages=function_augmented_prompt,
         stream=SHOULD_STREAM
     )
 
@@ -577,7 +683,7 @@ def conversation_without_data(request_body):
 
     if not SHOULD_STREAM:
         response_obj = {
-            "id": response,
+            "id": response.id,
             "model": response.model,
             "created": response.created,
             "object": response.object,
@@ -614,24 +720,37 @@ def get_blob_sas_url():
 @app.route("/conversation", methods=["GET", "POST"])
 def conversation():
     request_body = request.json
-    return conversation_internal(request_body)
+    return handler.conversation_internal(request_body)
+    
 
-def conversation_internal(request_body):
-    try:
-        use_data = should_use_data()
-        if use_data:
-            return conversation_with_data(request_body)
-        else:
-            return conversation_without_data(request_body)
-    except Exception as e:
-        logging.exception("Exception in /conversation")
-        return jsonify({"error": str(e)}), 500
+# def conversation_internal(request_body):
+#     function_to_call, parameters, is_function, classification_message = classify(request_body)
+#     if is_function:
+#         missing_params = check_missing_parameters(parameters)
+#         if missing_params:
+#             follow_up_question = ask_follow_up_question(missing_params, classification_message, request_body)
+#             return follow_up_question
+#         else:
+#             function_augmented_prompt = call_function(function_to_call, parameters)
+#             return conversation_without_data(request_body, function_augmented_prompt)
+#     else:
+#         try:
+#             use_data = should_use_data()
+#             if use_data:
+#                 return conversation_with_data(request_body)
+#             else:
+#                 return conversation_without_data(request_body)
+#         except Exception as e:
+#             logging.exception("Exception in /conversation")
+#             return jsonify({"error": str(e)}), 500
+        
 
 ## Conversation History API ## 
 @app.route("/history/generate", methods=["POST"])
 def add_conversation():
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user['user_principal_id']
+    # access_token = authenticated_user['access_token']
 
     ## check request for conversation_id
     conversation_id = request.json.get("conversation_id", None)
@@ -666,7 +785,10 @@ def add_conversation():
         request_body = request.json
         history_metadata['conversation_id'] = conversation_id
         request_body['history_metadata'] = history_metadata
-        return conversation_internal(request_body)
+        
+        # user_token = None
+        # user_token = request.headers.get('X-MS-TOKEN-AAD-ACCESS-TOKEN', "")
+        return handler.conversation_internal(request_body)
        
     except Exception as e:
         logging.exception("Exception in /history/generate")
@@ -678,7 +800,7 @@ def update_conversation():
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user['user_principal_id']
 
-    ## check request for conversation_id
+    # check request for conversation_id
     conversation_id = request.json.get("conversation_id", None)
 
     try:
@@ -758,6 +880,7 @@ def list_conversations():
 
 @app.route("/history/read", methods=["POST"])
 def get_conversation():
+    session['user_confirmation'] = False
     authenticated_user = get_authenticated_user_details(request_headers=request.headers)
     user_id = authenticated_user['user_principal_id']
 
@@ -871,20 +994,25 @@ def generate_title(conversation_messages):
     messages = [{'role': msg['role'], 'content': msg['content']} for msg in conversation_messages]
     messages.append({'role': 'user', 'content': title_prompt})
 
+
+
     try:
         ## Submit prompt to Chat Completions for response
+        # CHANGE-SDK
         base_url = AZURE_OPENAI_ENDPOINT if AZURE_OPENAI_ENDPOINT else f"https://{AZURE_OPENAI_RESOURCE}.openai.azure.com/"
-        openai.api_type = "azure"
-        openai.api_base = base_url
-        openai.api_version = "2023-03-15-preview"
-        openai.api_key = AZURE_OPENAI_KEY
-        completion = openai.ChatCompletion.create(    
-            engine=AZURE_OPENAI_MODEL,
+        client = openai.AzureOpenAI(
+            azure_endpoint=base_url,
+            api_key=AZURE_OPENAI_KEY,
+            api_version="2024-02-01",
+        )
+        
+        completion = client.chat.completions.create(
+            model=AZURE_OPENAI_MODEL,
             messages=messages,
             temperature=1,
-            max_tokens=64 
+            max_tokens=64
         )
-        title = json.loads(completion['choices'][0]['message']['content'])['title']
+        title = json.loads(completion.choices[0].text)['title']
         return title
     except Exception as e:
         return messages[-2]['content']

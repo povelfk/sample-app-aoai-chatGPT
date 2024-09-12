@@ -1,0 +1,24 @@
+[
+    {
+        "data_paths": [
+            {
+                "path": "https://storagediggechatbot.blob.core.windows.net/project-khamn/",
+                "url_prefix": "https://storagediggechatbot.blob.core.windows.net/project-khamn/"
+            },
+            {
+                "path": "https://storageaccountpovelbot.blob.core.windows.net/project-khamn/",
+                "url_prefix": "https://storageaccountpovelbot.blob.core.windows.net/project-khamn/"
+            }
+        ],
+        "location": "westeurope",
+        "subscription_id": "ea41ce80-2e64-4e78-b06b-38c79e6f0d53",
+        "resource_group": "rg-diggechatbot",
+        "search_service_name": "search-diggechatbot",
+        "index_name": "asdqwe123",
+        "chunk_size": 512,
+        "token_overlap": 64,
+        "semantic_config_name": "default",
+        "language": "sv",
+        "vector_config_name": "default"
+    }
+]

@@ -32,6 +32,7 @@ from dotenv import load_dotenv
 # from bs4 import BeautifulSoup
 import docx2txt
 
+load_dotenv()
 
 FILE_FORMAT_DICT = {
         "md": "markdown",
@@ -229,6 +230,7 @@ class Document(object):
     url: Optional[str] = None
     metadata: Optional[Dict] = None
     contentVector: Optional[List[float]] = None
+    testField: Optional[str] = None
 
 def cleanup_content(content: str) -> str:
     """Cleans up the given content using regexes
@@ -617,29 +619,29 @@ def merge_chunks_serially(chunked_content_list: List[str], num_tokens: int) -> G
 
 
 def get_embedding(text, embedding_model_endpoint=None, embedding_model_key=None, azure_credential=None):
-    endpoint = embedding_model_endpoint if embedding_model_endpoint else os.environ.get("EMBEDDING_MODEL_ENDPOINT")
-    key = embedding_model_key if embedding_model_key else os.environ.get("EMBEDDING_MODEL_KEY")
+    endpoint = embedding_model_endpoint if embedding_model_endpoint else os.environ.get("AZURE_OPENAI_EMBEDDING_ENDPOINT")
+    key = embedding_model_key if embedding_model_key else os.environ.get("AZURE_OPENAI_KEY")
     
-    if azure_credential is None and (endpoint is None or key is None):
-        raise Exception("EMBEDDING_MODEL_ENDPOINT and EMBEDDING_MODEL_KEY are required for embedding")
-
+    if endpoint is None or key is None:
+        raise Exception("AZURE_OPENAI_EMBEDDING_ENDPOINT and AZURE_OPENAI_KEY are required for embedding")
+    
     try:
         endpoint_parts = endpoint.split("/openai/deployments/")
         base_url = endpoint_parts[0]
         deployment_id = endpoint_parts[1].split("/embeddings")[0]
 
-        openai.api_version = '2023-05-15'
-        openai.api_base = base_url
+        client = openai.AzureOpenAI(
+            api_key=key,
+            api_version="2024-02-01",
+            azure_endpoint=base_url
+        )
 
-        if azure_credential is not None:
-            openai.api_key = azure_credential.get_token("https://cognitiveservices.azure.com/.default").token
-            openai.api_type = "azure_ad"
-        else:
-            openai.api_type = 'azure'
-            openai.api_key = key
+        embeddings = client.embeddings.create(
+            model=deployment_id,
+            input=text
+        )
 
-        embeddings = openai.Embedding.create(deployment_id=deployment_id, input=text)
-        return embeddings['data'][0]["embedding"]
+        return embeddings.model_dump()['data'][0]['embedding']
 
     except Exception as e:
         raise Exception(f"Error getting embeddings with endpoint={endpoint} with error={e}")
@@ -753,6 +755,7 @@ def chunk_content(
                 chunks.append(
                     Document(
                         content=chunk,
+                        testField="this is a test field",
                         title=doc.title,
                         url=url,
                         contentVector=doc.contentVector

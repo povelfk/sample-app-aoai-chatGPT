@@ -551,12 +551,20 @@ const Chat = () => {
     };
 
     const parseCitationFromMessage = (message: ChatMessage) => {
+        // CHANGE from tool
         if (message?.role && message?.role === "tool") {
+        // if (message?.role === "tool") {
+        // if (message && 'context' in message) {
+            // console.log("message", message)
             try {
                 const toolMessage = JSON.parse(message.content) as ToolMessageContent;
+                // console.log("citatoins", toolMessage.citations)
+                // const toolMessage = JSON.parse(JSON.stringify(message.context)) as ToolMessageContent;
+                // console.log("toolMessage", toolMessage) 
                 return toolMessage.citations;
             }
             catch {
+                // console.log("FAAN")
                 return [];
             }
         }
@@ -597,7 +605,7 @@ const Chat = () => {
                             </Stack>
                         ) : (
                             <div className={styles.chatMessageStream} style={{ marginBottom: isLoading ? "40px" : "0px" }} role="log">
-                                {messages.map((answer, index) => (
+                                {messages.map((answer, index) => (             
                                     <>
                                         {answer.role === "user" ? (
                                             <div className={styles.chatMessageUser} tabIndex={0}>
@@ -620,6 +628,8 @@ const Chat = () => {
                                                 <span className={styles.chatMessageErrorContent}>{answer.content}</span>
                                             </div> : null
                                         )}
+                                        
+                                        
                                     </>
                                 ))}
                                 {showLoadingMessage && (

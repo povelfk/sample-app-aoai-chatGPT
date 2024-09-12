@@ -19,3 +19,5 @@ infra_rg/
 01-deploy-webapp.ps1
 02-set-app-settings.ps1
 03-deploy-bicep.ps1
+common/
+prompts/

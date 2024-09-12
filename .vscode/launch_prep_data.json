@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: data_preparation.py",
+            "type": "python",
+            "request": "launch",
+            "python": "C:/Users/povelf/AppData/Local/miniconda3/envs/rv/python.exe",
+            "program": "${workspaceFolder}/scripts/data_preparation.py",
+            "args": [
+                "--config", "C:/Users/povelf/OneDrive - Microsoft/Povel @ MSFT/EXTERNAL/Customers/Region_vasterbotten/01_chatbot/repositories/sample-app-aoai-chatGPT/scripts/config_rv.json",
+                "--njobs", "8",
+                "--form-rec-resource", "form-recognizer-jd5ypzfx2l6vi",
+                "--form-rec-key", "631c10de91c5428a822d17880e7c5ba3",
+                "--form-rec-use-layout",
+                "--embedding-model-endpoint", "https://rv-chatbot-aoai.openai.azure.com/openai/deployments/text-embedding-ada-002/embeddings?api-version=2023-06-01-preview",
+                "--embedding-model-key", "1a84b820808241f3b1ab49ceaff19f1f",
+                "--search-admin-key", "omleyzSnaE1LguzkKUSTruoaCNTTIZKqwgrlCRYH1WAzSeCdPdhE"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}
